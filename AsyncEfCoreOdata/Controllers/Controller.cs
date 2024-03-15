@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
+using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace AsyncEfCoreOdata.Controllers
 {
@@ -20,7 +21,7 @@ namespace AsyncEfCoreOdata.Controllers
       }
     }
 
-    [EnableQuery]
+    [CustomEnableQueryAttribute]
     public async Task<ActionResult> Get()
     {
 
@@ -35,10 +36,26 @@ namespace AsyncEfCoreOdata.Controllers
 
       // Use a Values statement to return customers
       return Ok(context.Database.SqlQueryRaw<Customer>(
-        "Select 1 as Id, 'Customer 1' as Name union all Select 2 as Id, 'Customer 2' as Name union all Select 3 as Id, 'Customer 3' as Name")); 
+        "Select 1 as Id, 'Customer 1' as Name union all Select 2 as Id, 'Customer 2' as Name union all Select 3 as Id, 'Customer 3' as Name"));
     }
 
   }
+
+  public class CustomEnableQueryAttribute : EnableQueryAttribute
+  {
+    public override void OnActionExecuted(ActionExecutedContext actionExecutedContext)
+    {
+      base.OnActionExecuted(actionExecutedContext);
+      if (actionExecutedContext.Result is ObjectResult { DeclaredType: null } objectResult)
+      {
+        if (objectResult.Value is IAsyncEnumerable<Customer>)
+        {
+          objectResult.DeclaredType = typeof(IAsyncEnumerable<Customer>);
+        }
+      }
+    }
+  }
+
   public class Customer
   {
     public int Id { get; set; }
@@ -49,7 +66,7 @@ namespace AsyncEfCoreOdata.Controllers
     public MyDbContext(DbContextOptions<MyDbContext> options)
       : base(options)
     {
-      
+
     }
   }
 }
